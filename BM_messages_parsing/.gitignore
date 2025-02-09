@@ -1,0 +1,15 @@
+# .gitignore
+
+# Ignore the config file containing the API token
+config.py
+
+# Ignore the directory where processed data is stored
+parsed_data/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore virtual environment directories
+venv/
+.env/
