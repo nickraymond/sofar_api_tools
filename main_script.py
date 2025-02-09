@@ -1,4 +1,4 @@
-# filename: sofar_api_parsin_v4.py
+# filename: main_script.py
 # description: make multiple API call for wave and sensor data for unit with load cell and current meter, then plot waves, currents, and force
 # TODO
 # update logic to know difference between data types, and add sensor position, units, and data_type to  JSON parsing for managed sensors
@@ -16,118 +16,18 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.widgets import Slider
 import pandas as pd
-
-# Spotter API token
-token = "019058d08091ed2b1f96e774344874"
+from config import API_TOKEN
+from spot_config import SPOTTER_CONFIGS
 
 # Conversion factors
 meter_to_feet = 3.28084
 m_per_s_to_knots = 1.94384
 newton_to_lbf = 0.224809
 
-#============================
-# BM Camera
-#============================
-#potterId = "SPOT-31380C" # BM Camera unit
-#deployment_date_str = "2024-11-23T00:30:00Z"  # Replace with your desired start date and time
 
-# Input the local timestamp as a string
-# local_date_str = "2024-11-23T19:00:00"  # Replace with your local date and time
-# local_timezone_str = "America/Los_Angeles"  # Replace with your local timezone
-#
-# # Parse the local timestamp
-# local_timezone = pytz.timezone(local_timezone_str)
-# local_datetime = local_timezone.localize(datetime.strptime(local_date_str, "%Y-%m-%dT%H:%M:%S"))
-#
-# # Convert to UTC
-# utc_datetime = local_datetime.astimezone(pytz.utc)
-# deployment_date_str = utc_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
-#
-# print(f"Local Time: {local_datetime}")
-# print(f"UTC Time: {deployment_date_str}")
-
-#============================
-# Tilt Sensor Deployments
-#============================
-spotterId = "SPOT-32010C" ## HMB unit w/current meter
-deployment_date_str = "2024-12-06T00:00:00Z"  # when we put hardware into water
-
-
-#============================
-# Half Moon Bay Deployments
-#============================
-
-# spotterId = "SPOT-31088C" ## HMB unit w/current meter
-# deployment_date_str = "2024-10-31T00:00:00Z"  # when we put hardware into water
-
-
-# Half Moon Bay Conventional Marker Buoy
-#spotterId = "SPOT-30022R" # HMB reference spar buoy
-# deployment_date_str = "2024-08-20T00:00:00Z"  # Replace with your desired start date and time
-
-# HMB hydrophone test unit
-# spotterId = "SPOT-32071C" # HMB hydrophone test unit
-# deployment_date_str = "2024-11-20T00:00:00Z"
-
-#============================
-# Deakin - 8m wave
-# #============================
-# spotterId = "SPOT-31761C"
-# deployment_date_str = "2024-08-20T00:00:00Z"  # Replace with your desired start date and time
-
-
-#spotterId = "SPOT-31576C"
-#deployment_date_str = "2024-05-01T00:00:00Z"  # Replace with your desired start date and time
-
-#============================
-# IQT - Eng Test Units
-# #============================
-#spotterId = "SPOT-31817C" ## IQT unit summer unit
-
-
-#============================
-# AHEC Turbidity Unit
-# #============================
-# spotterId = "SPOT-31731C"
-# deployment_date_start_str = "2024-05-28T00:00:00Z"  # Replace with your desired start date and time
-# deployment_date_end_str = "2024-07-23T00:00:00Z"
-#
-# start_date = datetime.strptime(deployment_date_start_str, "%Y-%m-%dT%H:%M:%SZ")
-# end_date = datetime.strptime(deployment_date_end_str, "%Y-%m-%dT%H:%M:%SZ")
-
-#============================
-# UWA Haul Line Unit
-# #============================
-# spotterId = "SPOT-30956C"
-# start_date = datetime.strptime("2024-01-30T00:00:00Z","%Y-%m-%dT%H:%M:%SZ")  # Replace with your desired start date and time
-# end_date = datetime.strptime("2024-05-21T00:00:00Z","%Y-%m-%dT%H:%M:%SZ")
-
-### ======================================================================
-### ======================================================================
-
-
-
-
-### ======================================================================
-# # Use this if you want to determine time from today
-#
-# # Parse deployment date string into a datetime object
-# deployment_date = datetime.strptime(deployment_date_str, "%Y-%m-%dT%H:%M:%SZ")
-#
-#
-# Define the number of days before today for the start_date
-days_before = 1
-now = datetime.utcnow()
-start_date = now - timedelta(days=days_before)
-end_date = now + timedelta(minutes=30)
-### ======================================================================
-
-
-# Base directory for saving data
-base_directory = 'parsed_data'
-if not os.path.exists(base_directory):
-    os.makedirs(base_directory)
-
+# Ensure the parsed_data directory exists
+if not os.path.exists('BM_messages_parsing/parsed_data'):
+    os.makedirs('BM_messages_parsing/parsed_data')
 
 def api_login(api_url):
     """Fetch data from the Sofar API."""
@@ -139,67 +39,8 @@ def api_login(api_url):
         print(f"Failed to fetch data. Status code: {response.status_code}")
         raise Exception("API request failed.")
 
-# def fetch_data_in_chunks(start_datetime, end_datetime, chunk_size_days=5, data_type="wave"):
-#     """Fetch data from the API in chunks of `chunk_size_days` days and combine into a single JSON object."""
-#     combined_data = {"data": {}}  # Initialize combined data structure
-#     current_start = start_datetime
-#
-#     # Define top-level keys for wave and sensor data
-#     if data_type == "wave":
-#         keys = ["waves", "wind", "surfaceTemp", "barometerData"]
-#     elif data_type == "sensor":
-#         keys = []  # Assume sensor data has a flat structure
-#     else:
-#         raise ValueError(f"Invalid data_type: {data_type}")
-#
-#     # Initialize empty lists for each key
-#     for key in keys:
-#         combined_data["data"][key] = []
-#
-#     while current_start < end_datetime:
-#         current_end = current_start + timedelta(days=chunk_size_days)
-#         if current_end > end_datetime:
-#             current_end = end_datetime
-#
-#         chunk_start = current_start.strftime("%Y-%m-%dT%H:%M:%SZ")
-#         chunk_end = current_end.strftime("%Y-%m-%dT%H:%M:%SZ")
-#
-#         # Construct the appropriate API URL
-#         if data_type == "wave":
-#             api_url = (
-#                 f"https://api.sofarocean.com/api/wave-data?spotterId={spotterId}&startDate={chunk_start}"
-#                 f"&endDate={chunk_end}&token={token}&includeWindData=true&includeSurfaceTempData=true"
-#                 f"&includeBarometerData=true&limit=500&processingSources=all"
-#             )
-#         elif data_type == "sensor":
-#             api_url = (
-#                 f"https://api.sofarocean.com/api/sensor-data?spotterId={spotterId}&startDate={chunk_start}"
-#                 f"&endDate={chunk_end}&token={token}&limit=500"
-#             )
-#         else:
-#             raise ValueError(f"Invalid data_type: {data_type}")
-#
-#         print(f"Fetching {data_type} data for {chunk_start} to {chunk_end}...")
-#         chunk_data = api_login(api_url)
-#
-#         if "data" in chunk_data:
-#             if data_type == "wave":
-#                 # Combine wave data by appending to corresponding lists
-#                 for key in keys:
-#                     if key in chunk_data["data"]:
-#                         combined_data["data"][key].extend(chunk_data["data"][key])
-#             elif data_type == "sensor":
-#                 # Combine sensor data by appending to a flat list
-#                 if "data" not in combined_data:
-#                     combined_data["data"] = []
-#                 combined_data["data"].extend(chunk_data["data"])
-#         else:
-#             print(f"No {data_type} data returned for {chunk_start} to {chunk_end}.")
-#
-#         current_start = current_end
-#
-#     return combined_data
-def fetch_data_in_chunks(start_datetime, end_datetime, chunk_size_days=5, data_type="wave"):
+
+def fetch_data_in_chunks(start_datetime, end_datetime, spotter_id, chunk_size_days=5, data_type="wave"):
     """Fetch data from the API in chunks of `chunk_size_days` days and combine into a single JSON object."""
     # Initialize combined data structure
     if data_type == "wave":
@@ -222,14 +63,14 @@ def fetch_data_in_chunks(start_datetime, end_datetime, chunk_size_days=5, data_t
         # Construct the appropriate API URL
         if data_type == "wave":
             api_url = (
-                f"https://api.sofarocean.com/api/wave-data?spotterId={spotterId}&startDate={chunk_start}"
-                f"&endDate={chunk_end}&token={token}&includeWindData=true&includeSurfaceTempData=true"
+                f"https://api.sofarocean.com/api/wave-data?spotterId={spotter_id}&startDate={chunk_start}"
+                f"&endDate={chunk_end}&token={API_TOKEN}&includeWindData=true&includeSurfaceTempData=true"
                 f"&includeBarometerData=true&limit=500&processingSources=all"
             )
         elif data_type == "sensor":
             api_url = (
-                f"https://api.sofarocean.com/api/sensor-data?spotterId={spotterId}&startDate={chunk_start}"
-                f"&endDate={chunk_end}&token={token}&limit=500"
+                f"https://api.sofarocean.com/api/sensor-data?spotterId={spotter_id}&startDate={chunk_start}"
+                f"&endDate={chunk_end}&token={API_TOKEN}&limit=500"
             )
         else:
             raise ValueError(f"Invalid data_type: {data_type}")
@@ -280,7 +121,7 @@ def extract_force_values(message):
         mean_force = float(mean_match.group(1))
     return min_force, max_force, mean_force
 
-def process_smart_mooring_data(json_data):
+def process_smart_mooring_data(spotter_id, json_data):
     """Process 'sensor-data' JSON and save parsed data by Node ID."""
     grouped_data = defaultdict(list)
     unique_node_ids = set()
@@ -309,7 +150,7 @@ def process_smart_mooring_data(json_data):
         unique_node_ids.add(node_id)
 
         # Save each node's data to a CSV in a subfolder
-        node_directory = os.path.join(base_directory, node_id)
+        node_directory = os.path.join('BM_messages_parsing/parsed_data', node_id)
         if not os.path.exists(node_directory):
             os.makedirs(node_directory)
 
@@ -321,7 +162,7 @@ def process_smart_mooring_data(json_data):
     print("Unique Node IDs found:", unique_node_ids)
     return grouped_data, unique_node_ids
 
-def process_wave_data(api_data_wave):
+def process_wave_data(spotter_id, api_data_wave):
     """Process wave data, including wave, wind, sea surface temperature, and barometer data."""
     base_directory = "parsed_data/spotter_wave"
     if not os.path.exists(base_directory):
@@ -587,18 +428,6 @@ def plot_gps_coordinates(wave_data, spotter_id):
 
     plt.show()
 
-# def process_wave_data(api_data_wave):
-#     """Process wave data and save it to CSV."""
-#     wave_csv = os.path.join(base_directory, "waves.csv")
-#     try:
-#         for chunk in api_data_wave:
-#             if "data" in chunk and "waves" in chunk["data"]:
-#                 for entry in chunk["data"]["waves"]:
-#                     save_to_csv(entry, wave_csv, header=not os.path.exists(wave_csv))
-#     except KeyError as e:
-#         print(f"Error processing wave data: {e}")
-#     print("Wave data processing complete.")
-
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 import pandas as pd
@@ -608,25 +437,39 @@ print(ctx.providers)
 
 
 
-def main():
+def process_and_plot_data(spotter_id, start_date, end_date):
+    """Fetch, process, and plot data for a given SPOT ID."""
+    print(f"Processing data for SPOT ID: {spotter_id}")
+
+    print("Data fetching, processing, and plotting complete.")
+    print("Start date:", start_date.strftime("%m/%d/%Y"))
+    print("End date:", end_date.strftime("%m/%d"))
+    print("Number of days between the start and end date:", end_date - start_date)
+
     # Fetch wave data and smart mooring data as combined JSON objects
-    api_data_waves = fetch_data_in_chunks(start_date, end_date, chunk_size_days=5, data_type="wave")
-    api_data_smart_mooring = fetch_data_in_chunks(start_date, end_date, chunk_size_days=5, data_type="sensor")
+    api_data_waves = fetch_data_in_chunks(start_date, end_date,spotter_id, chunk_size_days=5, data_type="wave")
+    api_data_smart_mooring = fetch_data_in_chunks(start_date, end_date, spotter_id, chunk_size_days=5, data_type="sensor")
 
     # Process the smart mooring data and wave data
-    smart_mooring_data, unique_node_ids = process_smart_mooring_data(api_data_smart_mooring)
-    process_wave_data(api_data_waves)
+    smart_mooring_data, unique_node_ids = process_smart_mooring_data(spotter_id, api_data_smart_mooring)
+    process_wave_data(spotter_id, api_data_waves)
 
     # Plot data for all unique Node IDs found
-    plot_data(smart_mooring_data, unique_node_ids, api_data_waves["data"], spotterId)
+    plot_data(smart_mooring_data, unique_node_ids, api_data_waves["data"], spotter_id)
 
     # Plot the GPS coordiantes from wave data
-    plot_gps_coordinates(api_data_waves["data"],spotterId)
+    plot_gps_coordinates(api_data_waves["data"],spotter_id)
 
 
     print("Data fetching, processing, and plotting complete.")
+    print("Start date:", start_date.strftime("%m/%d/%Y"))
+    print("End date:", end_date.strftime("%m/%d"))
+    print("Number of days between the start and end date:", end_date - start_date)
 
 
+def main():
+    for config in SPOTTER_CONFIGS:
+        process_and_plot_data(config['spotter_id'], config['start_date'], config['end_date'])
 
 if __name__ == "__main__":
     main()
