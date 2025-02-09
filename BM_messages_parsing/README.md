@@ -25,7 +25,12 @@ The script can be configured for different Spotter deployments by adjusting para
 - **contextily**: Used for overlaying maps (if required).
 
 ---
+# If using Pycharm IDE
+You should disable the "Show plots in tool window" feature in PyCharm:
 
+Navigate to File > Settings > Tools > Python Scientific.
+Uncheck the option labeled "Show plots in tool window".
+---
 ## How It Works
 
 1. **Fetch Data from API**:
